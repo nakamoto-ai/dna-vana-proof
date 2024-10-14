@@ -23,17 +23,9 @@ class Proof:
 
         for input_filename in os.listdir(self.config['input_dir']):
             input_file = os.path.join(self.config['input_dir'], input_filename)
-            if os.path.splitext(input_file)[1].lower() == '.json':
+            if os.path.splitext(input_file)[1].lower() == '.txt':
                 with open(input_file, 'r') as f:
-                    input_data = json.load(f)
-
-                    if input_filename == 'account.json':
-                        account_email = input_data.get('email', None)
-                        continue
-
-                    elif input_filename == 'activity.json':
-                        total_score = sum(item['score'] for item in input_data)
-                        continue
+                    print(f"Text file found: {input_file}")
 
         email_matches = self.config['user_email'] == account_email
         score_threshold = fetch_random_number()
