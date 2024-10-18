@@ -20,8 +20,11 @@ def load_config() -> Dict[str, Any]:
         'use_sealing': os.path.isdir(SEALED_DIR),
         'input_dir': INPUT_DIR,
         'user_email': os.environ.get('USER_EMAIL', None),
+        'token': os.environ.get('token', None),
+        'key': os.environ.get('key', None),
+        'verify': os.environ.get('verify', None),
+        'endpoint': os.environ.get('endpoint', None)
     }
-    logging.info(f"Using config: {json.dumps(config, indent=2)}")
     return config
 
 
