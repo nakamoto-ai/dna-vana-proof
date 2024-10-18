@@ -4,6 +4,12 @@ import os
 from typing import Dict, Any
 
 import requests
+import gc
+import re
+import pandas as pd
+import hashlib
+import math
+import json
 
 from my_proof.models.proof_response import ProofResponse
 from .verify import DbSNPHandler
@@ -32,24 +38,39 @@ class TwentyThreeWeFileScorer:
     valid_genotypes = set("ATCG-ID")
     valid_chromosomes = set([str(i) for i in range(1, 23)] + ["X", "Y", "MT"])
 
-    def __init__(self, input_data):
+    def __init__(self, input_data, config):
         self.input_data = input_data
         self.profile_id = self.get_profile_id(input_data)
+        self.config = config
+        self.proof_response = None
+        self.hash = None
+        self.sender_address = None
 
     @staticmethod
     def get_profile_id(input_data):
-
         file_content = "\n".join([d for d in input_data[:50]])
 
-        # Define the regular expression pattern to find the profile ID
-        pattern = r'https://you\.23andme\.com/p/([a-z0-9]+)/tools/data/download/'
+        # Define the URL pattern you're looking for
+        url_prefix = 'https://you.23andme.com/p/'
+        url_suffix = '/tools/data/download/'
 
-        # Search for the profile ID in the file content
-        match = re.search(pattern, file_content)
+        # Find the starting position of the URL pattern
+        start_index = file_content.find(url_prefix)
+        if start_index == -1:
+            return None  # URL not found
 
-        # If a match is found, return the profile ID
-        if match:
-            return match.group(1)
+        # Find the ending position of the profile ID (end of the URL)
+        end_index = file_content.find(url_suffix, start_index)
+        if end_index == -1:
+            return None  # URL suffix not found
+
+        # Extract the profile ID between the URL prefix and suffix
+        profile_id_start = start_index + len(url_prefix)
+        profile_id = file_content[profile_id_start:end_index]
+
+        # Return the profile ID if found, otherwise None
+        if profile_id:
+            return profile_id
         else:
             return None
 
@@ -65,12 +86,13 @@ class TwentyThreeWeFileScorer:
                 header_lines.append(line.strip())
             else:
                 break  # Stop reading after headers
-        return "\n".join(header_lines)
+        header = "\n".join(header_lines[1:])
+        return header
 
     def check_header(self):
         file_header = self.read_header()
 
-        clean_template = "\n".join([line.strip() for line in self.header_template.strip().split("\n")])
+        clean_template = "\n".join([line.strip() for line in self.header_template.strip().split("\n") if """https://you.23andme.com""" not in line])
         clean_file_header = file_header.strip()
 
         return clean_template == clean_file_header
@@ -81,6 +103,8 @@ class TwentyThreeWeFileScorer:
         line_number = 1
         for line in self.input_data:
             line = line.strip()
+            if "#" in line:
+                continue
             if not line:
                 print(f"File ended unexpectedly at line {line_number}.")
                 return False
@@ -109,24 +133,32 @@ class TwentyThreeWeFileScorer:
                 invalid_rows.append(row)
 
             line_number += 1
+        if invalid_rows:
+            return False
+        return True
 
     def verify_profile(self):
         """
         Sends the profile id for verification via a POST request.
         """
-        # response = requests.post(url="api-url-here", params={'profile_id': self.profile_id})
-        # return response.json()
-        # Add real post request logic here
-        return True, False
+        self.sender_address = self.config['verify'].split('address=')[-1]
+        url = f"{self.config['verify']}&profile_id={self.profile_id}"
+        response = requests.get(url=url)
+        resp = response.json()
+        profile_verified = resp.get('is_approved', False)
 
-    def verify_hash(self, hashed_dna):
+        return profile_verified
+
+    def verify_hash(self, genome_hash):
         """
-        Sends the profile id for verification via a POST request.
+        Sends the hashed genome data for verification via a POST request.
         """
-        # response = requests.post(url="api-url-here", params={'hashed_dna': hashed_dna})
-        # return response.json()
-        # Add real post request logic here
-        return True
+        url = f"{self.config['key']}&genome_hash={genome_hash}"
+        response = requests.get(url=url)
+        resp = response.json()
+        hash_unique = resp.get('is_unique', False)
+
+        return hash_unique
 
     def hash_23andme_file(self, file_path):
         # Read the 23andMe file into a DataFrame, skipping the comment lines
@@ -150,21 +182,21 @@ class TwentyThreeWeFileScorer:
         # Hash the concatenated string using SHA-256
         hash_object = hashlib.sha256(concatenated_string.encode())
         hash_hex = hash_object.hexdigest()
+        self.hash = hash_hex
 
         return hash_hex
 
     @staticmethod
     def invalid_genotypes_score(total: int, low: int = 1, high: int = 3):
-        if total < low:
+        if total <= low:
             return 1.0
-        elif total > high:
+        elif total >= high:
             return 0.0
         else:
-            # Decrease score linearly from 1.0 to 0.0 between 'low' and 'high'
-            return 1.0 - (total - low) / (low - high)
+            return 1.0 - (total - low) / (high - low)
 
     @staticmethod
-    def indel_score(total, low: int = 5, ultra_low: int = 2, high: int = 13, ultra_high: int = 22):
+    def indel_score(total, low: int = 3, ultra_low: int = 1, high: int = 13, ultra_high: int = 22):
         if total <= ultra_low:
             return 0.0
         elif ultra_low < total <= low:
@@ -172,44 +204,74 @@ class TwentyThreeWeFileScorer:
         elif low < total <= high:
             return 1.0
         elif high < total <= ultra_high:
-            return 1.0 - (total - high) / (ultra_high - high)
+            return (ultra_high - total) / (ultra_high - high)
         else:
             return 0.0
 
     @staticmethod
-    def i_rsid_score(total: int, low: int = 8, high: int = 16):
-        if total < low:
+    def i_rsid_score(total: int, low: int = 5, high: int = 25):
+        if total <= low:
             return 1.0
-        elif total > high:
+        elif total >= high:
             return 0.0
         else:
-            # Decrease score linearly from 1.0 to 0.0 between 'low' and 'high'
-            return 1.0 - (total - low) / (low - high)
+            return 0.5
 
     @staticmethod
-    def percent_verification_score(verified: int, all: int, low: int = 0.93, ultra_low: int = 0.9, high: int = 0.96, ultra_high: int = 0.975):
+    def percent_verification_score(verified: int, all: int, low: float = 0.9, ultra_low: float = 0.85,
+                                   high: float = 0.96, ultra_high: float = 0.98):
         verified_ratio = verified / all
+
         if low <= verified_ratio <= high:
             return 1.0
         elif ultra_low < verified_ratio < low:
-            return 1 - (verified - ultra_low) / (low - ultra_low)
+            return (verified_ratio - ultra_low) / (low - ultra_low)
         elif high < verified_ratio <= ultra_high:
-            return 1 - (verified - high) / (ultra_high - high)
+            return (ultra_high - verified_ratio) / (ultra_high - high)
         elif verified_ratio > ultra_high:
-            return 0
+            return 0.0
         else:
-            return 0
+            return 0.0
+
+    def save_hash(self, proof_response):
+
+        hash_data = self.generate_hash_save_data(proof_response)
+        response = requests.post(url=self.config['key'], data=hash_data)
+        resp = response.json()
+        success = resp.get('success', False)
+
+        return success
+
+    def generate_hash_save_data(self, proof_response):
+        hash_save_data = {
+            'sender_address': self.sender_address,
+            'attestor_address': '',
+            'tee_url': '',
+            'job_id': '',
+            'file_id': '',
+            'profile_id': self.profile_id,
+            'genome_hash': self.hash,
+            'authenticity_score': proof_response.authenticity,
+            'ownership_score': proof_response.ownership,
+            'uniqueness_score': proof_response.uniqueness,
+            'quality_score': proof_response.quality,
+            'total_score': proof_response.attributes['total_score'],
+            'score_threshold': proof_response.attributes['score_threshold'],
+            'is_valid': proof_response.valid
+        }
+
+        return hash_save_data
 
     def proof_of_ownership(self) -> float:
-        validated, submitted = self.verify_profile()
-        if validated and not submitted:
+        validated = self.verify_profile()
+        if validated:
             return 1.0
         else:
             return 0
 
     def proof_of_quality(self, filepath) -> float:
 
-        dbsnp = DbSNPHandler()
+        dbsnp = DbSNPHandler(self.config)
         results = dbsnp.dbsnp_verify(filepath)
 
         invalid_score = self.invalid_genotypes_score(results['invalid_genotypes'])
@@ -251,22 +313,23 @@ class Proof:
 
         scorer = None
         twenty_three_file = None
+
         for input_filename in os.listdir(self.config['input_dir']):
             input_file = os.path.join(self.config['input_dir'], input_filename)
             with open(input_file, 'r') as i_file:
 
-                if input_filename.split('.')[-1] == '.txt':
+                if input_filename.split('.')[-1] == 'txt':
                     twenty_three_file = input_file
                     input_data = [f for f in i_file]
-                    scorer = TwentyThreeWeFileScorer(input_data=input_data)
+                    scorer = TwentyThreeWeFileScorer(input_data=input_data, config=self.config)
                     break
 
         score_threshold = 0.9
 
+        self.proof_response.uniqueness = scorer.proof_of_uniqueness(filepath=twenty_three_file)
         self.proof_response.ownership = scorer.proof_of_ownership()
-        self.proof_response.quality = scorer.proof_of_quality(filepath=twenty_three_file)
         self.proof_response.authenticity = scorer.proof_of_authenticity()
-        self.proof_response.uniqueness = scorer.proof_of_uniqueness()
+        self.proof_response.quality = scorer.proof_of_quality(filepath=twenty_three_file)
 
         # Calculate overall score and validity
         total_score = (0.25 * self.proof_response.quality + 0.25 * self.proof_response.ownership +
@@ -278,12 +341,18 @@ class Proof:
         self.proof_response.attributes = {
             'total_score': total_score,
             'score_threshold': score_threshold,
-            'email_verified': email_matches,
         }
 
         # Additional metadata about the proof, written onchain
         self.proof_response.metadata = {
             'dlp_id': self.config['dlp_id'],
         }
+
+        save_successful = scorer.save_hash(self.proof_response)
+
+        if save_successful:
+            print("Hash Data Saved Successfully.")
+        else:
+            raise Exception("Hash Data Saving Failed.")
 
         return self.proof_response

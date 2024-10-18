@@ -10,9 +10,8 @@ from typing import List, Tuple, Dict, Any
 import os
 import random
 from collections import defaultdict
-
-DB_PATH = os.path.expanduser('vcf_data.db')
-cumulative_time = {}
+import gc
+import json
 
 SAMPLE_GENOME_RESPONSE = {
   "valid": [
@@ -46,30 +45,6 @@ SAMPLE_GENOME_RESPONSE = {
 }
 
 
-def timeit(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        start_time = time.time()
-        result = func(*args, **kwargs)
-        end_time = time.time()
-        duration = end_time - start_time
-
-        if func.__name__ in cumulative_time:
-            cumulative_time[func.__name__] += duration
-        else:
-            cumulative_time[func.__name__] = duration
-
-        return result
-
-    return wrapper
-
-
-def print_cumulative_times():
-    print("\nExecution times for each function:")
-    for func_name, total_time in cumulative_time.items():
-        print(f"Total time for '{func_name}': {total_time:.4f} seconds")
-
-
 import sqlite3
 import time
 from functools import wraps
@@ -77,32 +52,11 @@ import re
 from typing import List, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-RSID_PATTERN = re.compile(r"^i\d+$")
-cumulative_time = {}
-
-
-def timeit(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        start_time = time.time()
-        result = func(*args, **kwargs)
-        end_time = time.time()
-        duration = end_time - start_time
-
-        if func.__name__ in cumulative_time:
-            cumulative_time[func.__name__] += duration
-        else:
-            cumulative_time[func.__name__] = duration
-
-        return result
-
-    return wrapper
-
 
 class DbSNPHandler:
 
-    def __init__(self):
-        pass
+    def __init__(self, config):
+        self.config = config
 
     @staticmethod
     def is_i_rsid(rsid: str) -> bool:
@@ -114,7 +68,6 @@ class DbSNPHandler:
         """Checks if the genotype is an indel."""
         return genotype == '--' or any(special in genotype.upper() for special in ['I', 'D'])
 
-    @timeit
     def handle_special_cases(self, rsid_array: np.ndarray, genotype_array: np.ndarray, invalid_genotypes: List[str],
                              indels: List[str], i_rsids: List[str]) -> Tuple[List[str], List[str], List[str]]:
         """
@@ -136,7 +89,6 @@ class DbSNPHandler:
 
         return indels, i_rsids, invalid_genotypes
 
-    @timeit
     def verify_snp(self, rsid: str | None, genotype: str) -> Tuple[None | str, None | str, None | str]:
         """
         Verifies the SNP by checking if it is a special rsid (e.g., i-rsid) or indel.
@@ -152,13 +104,11 @@ class DbSNPHandler:
 
         return rsid, None, None
 
-    @timeit
     def check_indels_and_i_rsids(self, rsid_list: List[str], genotype_list: List[str], invalid_genotypes: List[str],
                                  indels: List[str], i_rsids: List[str]) -> Dict[str, int | List[Any]]:
         """
         Checks for both indels and i-rsids by leveraging the `handle_special_cases` function.
         """
-        start_check = time.time()
 
         # Convert lists to arrays for vectorized operations
         rsid_array = np.array(rsid_list)
@@ -166,9 +116,6 @@ class DbSNPHandler:
 
         # Check for special cases and update the indels, i_rsids, and invalid genotypes
         indels, i_rsids, invalid_genotypes = self.handle_special_cases(rsid_array, genotype_array, invalid_genotypes, indels, i_rsids)
-
-        total_check_time = time.time() - start_check
-        print(f"Time spent on indel/i-rsid check: {total_check_time}")
 
         # Return the summary information
         dna_info = {
@@ -180,7 +127,6 @@ class DbSNPHandler:
 
         return dna_info
 
-    @timeit
     def verify_snps(self, df: pd.DataFrame) -> Tuple[List[str | None]]:
         """
         Verifies SNPs by checking for invalid, indels, and i-rsids cases.
@@ -244,12 +190,21 @@ class DbSNPHandler:
         """
         Sends the genome data for verification via a POST request.
         """
-        # response = requests.post(url="api-url-here", params={'genomes': final_list})
-        # return response.json()
-        # Add real post request logic here
-        return SAMPLE_GENOME_RESPONSE
+        token = self.config['token']
+        endpoint = self.config['endpoint']
 
-    @timeit
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": 'application/json'
+        }
+
+        data = json.dumps({'genomes': final_list})
+
+        response = requests.get(url=endpoint, data=data,
+                                headers=headers)
+        genome_response = response.json()
+        return genome_response
+
     def load_data(self, filepath: str) -> pd.DataFrame:
         """
         Loads the data from the file into a pandas DataFrame.
@@ -257,7 +212,6 @@ class DbSNPHandler:
         return pd.read_csv(filepath, comment='#', sep='\s+', names=['rsid', 'chromosome', 'position', 'genotype'],
                            dtype={'rsid': str, 'chromosome': str, 'position': int, 'genotype': str})
 
-    @timeit
     def filter_valid_chromosomes(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, List[str], List[str]]:
         """
         Filters the data to only include valid chromosomes.
@@ -279,7 +233,6 @@ class DbSNPHandler:
 
         return df_valid, unique_invalid_chromosomes, missing_chromosomes
 
-    @timeit
     def check_genotypes(self, df_valid: pd.DataFrame) -> Dict[str, int | List[Any]]:
         """
         Runs checks on genotypes for SNPs.
@@ -294,11 +247,8 @@ class DbSNPHandler:
         dna_info['dbsnp_verified'] = len(dbsnp_verified)
         dna_info['all'] += len(dbsnp_verified)
 
-        print(f"Invalid Genotypes: {invalid_genotypes}")
-
         return dna_info
 
-    @timeit
     def dbsnp_verify(self, filepath: str) -> Dict[str, Any]:
         """
         Verifies the SNPs in the provided file.
