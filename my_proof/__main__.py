@@ -36,7 +36,7 @@ def run() -> None:
     if not input_files_exist:
         raise FileNotFoundError(f"No input files found in {INPUT_DIR}")
 
-    input_file = os.listdir(config['input_dir'])[0]
+    input_file = os.path.join(self.config['input_dir'], os.listdir(config['input_dir'])[0])
     new_input_file = change_and_delete_file_extension(input_file, '.txt')
 
     proof = Proof(config)
