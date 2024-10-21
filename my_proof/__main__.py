@@ -21,7 +21,7 @@ def load_config() -> Dict[str, Any]:
         'input_dir': INPUT_DIR,
         'user_email': os.environ.get('USER_EMAIL', None),
         'token': os.environ.get('token', None),
-        'key': os.environ.get('key', None),
+        'key': os.environ.get('KEY', None),
         'verify': os.environ.get('verify', None),
         'endpoint': os.environ.get('endpoint', None)
     }
@@ -35,6 +35,12 @@ def run() -> None:
 
     if not input_files_exist:
         raise FileNotFoundError(f"No input files found in {INPUT_DIR}")
+
+    for c_val in ['token', 'key', 'verify', 'endpoint']:
+        if config[c_val] is not None:
+            print(f"Config '{c_val}' Found: {config[c_val]}")
+        else:
+            print(f"Config '{c_val}' Not Found")
 
     input_file = os.path.join(config['input_dir'], os.listdir(config['input_dir'])[0])
     new_input_file = change_and_delete_file_extension(input_file, '.txt')
