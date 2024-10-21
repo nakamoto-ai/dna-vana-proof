@@ -36,6 +36,9 @@ def run() -> None:
     if not input_files_exist:
         raise FileNotFoundError(f"No input files found in {INPUT_DIR}")
 
+    input_file = os.listdir(config['input_dir'])[0]
+    new_input_file = change_and_delete_file_extension(input_file, '.txt')
+
     proof = Proof(config)
     proof_response = proof.generate()
 
@@ -43,6 +46,21 @@ def run() -> None:
     with open(output_path, 'w') as f:
         json.dump(proof_response.dict(), f, indent=2)
     logging.info(f"Proof generation complete: {proof_response}")
+
+
+def change_and_delete_file_extension(file_path, new_extension):
+    # Split the file path into name and extension
+    base = os.path.splitext(file_path)[0]
+    new_file_path = base + new_extension
+
+    # Rename the file with the new extension
+    os.rename(file_path, new_file_path)
+
+    # Remove (delete) the old file
+    if os.path.exists(file_path):
+        os.remove(file_path)
+
+    return new_file_path
 
 
 def extract_input() -> None:
