@@ -1,5 +1,5 @@
 # Adjust this as needed.
-sgx.enclave_size = "256M"
+sgx.enclave_size = "1024M"
 
 # Increase this as needed, e.g., if you run a web server.
 sgx.max_threads = 4
