@@ -311,18 +311,15 @@ class Proof:
         """Generate proofs for all input files."""
         logging.info("Starting proof generation")
 
-        scorer = None
-        twenty_three_file = None
+        input_files = os.listdir(self.config['input_dir'])
+        print(f"Input Files: {input_files}")
 
-        for input_filename in os.listdir(self.config['input_dir']):
-            input_file = os.path.join(self.config['input_dir'], input_filename)
-            with open(input_file, 'r') as i_file:
-
-                if input_filename.split('.')[-1] == 'txt':
-                    twenty_three_file = input_file
-                    input_data = [f for f in i_file]
-                    scorer = TwentyThreeWeFileScorer(input_data=input_data, config=self.config)
-                    break
+        input_filename = os.listdir(self.config['input_dir'])[0]
+        input_file = os.path.join(self.config['input_dir'], input_filename)
+        with open(input_file, 'r') as i_file:
+            twenty_three_file = input_file
+            input_data = [f for f in i_file]
+            scorer = TwentyThreeWeFileScorer(input_data=input_data, config=self.config)
 
         score_threshold = 0.9
 
