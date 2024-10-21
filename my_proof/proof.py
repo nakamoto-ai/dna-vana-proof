@@ -314,6 +314,10 @@ class Proof:
         input_files = os.listdir(self.config['input_dir'])
         print(f"Input Files: {input_files}")
 
+        input_dirs = [d for d in os.listdir(self.config['input_dir']) if
+                os.path.isdir(os.path.join(self.config['input_dir'], d))]
+        print(f"Input Directories: {input_dirs}")
+
         input_filename = os.listdir(self.config['input_dir'])[0]
         input_file = os.path.join(self.config['input_dir'], input_filename)
         with open(input_file, 'r') as i_file:
