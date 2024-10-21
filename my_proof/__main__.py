@@ -35,7 +35,6 @@ def run() -> None:
 
     if not input_files_exist:
         raise FileNotFoundError(f"No input files found in {INPUT_DIR}")
-    extract_input()
 
     proof = Proof(config)
     proof_response = proof.generate()
