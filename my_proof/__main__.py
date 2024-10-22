@@ -25,6 +25,7 @@ def load_config() -> Dict[str, Any]:
         'verify': os.environ.get('VERIFY', None),
         'endpoint': os.environ.get('ENDPOINT', None)
     }
+    logging.info(f"Using config: {json.dumps(config, indent=2)}")
     return config
 
 
