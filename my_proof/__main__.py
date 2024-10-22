@@ -21,7 +21,7 @@ def load_config() -> Dict[str, Any]:
         'input_dir': INPUT_DIR,
         'user_email': os.environ.get('USER_EMAIL', None),
         'token': os.environ.get('token', None),
-        'key': os.environ.get('KEY', None),
+        'key': os.environ.get('key', None),
         'verify': os.environ.get('verify', None),
         'endpoint': os.environ.get('endpoint', None)
     }
