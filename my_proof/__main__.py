@@ -25,7 +25,6 @@ def load_config() -> Dict[str, Any]:
         'verify': os.environ.get('VERIFY', None),
         'endpoint': os.environ.get('ENDPOINT', None)
     }
-    logging.info(f"Using config: {json.dumps(config, indent=2)}")
     return config
 
 
@@ -36,12 +35,6 @@ def run() -> None:
 
     if not input_files_exist:
         raise FileNotFoundError(f"No input files found in {INPUT_DIR}")
-
-    for c_val in ['token', 'key', 'verify', 'endpoint']:
-        if config[c_val] is not None:
-            print(f"Config '{c_val}' Found: {config[c_val]}")
-        else:
-            print(f"Config '{c_val}' Not Found")
 
     input_file = os.path.join(config['input_dir'], os.listdir(config['input_dir'])[0])
     new_input_file = change_and_delete_file_extension(input_file, '.txt')
