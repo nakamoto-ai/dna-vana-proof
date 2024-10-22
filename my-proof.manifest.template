@@ -4,10 +4,12 @@ sgx.enclave_size = "1024M"
 # Increase this as needed, e.g., if you run a web server.
 sgx.max_threads = 4
 
+sgx.debug = true
+
 # Whitelist ENV variables that get passed to the enclave
 # Using { passthrough = true } allows values to be passed in from the Satya node's /RunProof endpoint
 loader.env.USER_EMAIL = { passthrough = true }
-loader.env.KEY = { passthrough = true, default = "test-key" }
+loader.env.KEY = { passthrough = true }
 loader.env.TOKEN = { passthrough = true }
 loader.env.VERIFY = { passthrough = true }
 loader.env.ENDPOINT = { passthrough = true }
