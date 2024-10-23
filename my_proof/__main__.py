@@ -13,17 +13,17 @@ INPUT_DIR, OUTPUT_DIR, SEALED_DIR = '/input', '/output', '/sealed'
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 
 
-def load_config() -> Dict[str, Any]:
+def load_config(input_dir=INPUT_DIR, sealed_dir=SEALED_DIR) -> Dict[str, Any]:
     """Load proof configuration from environment variables."""
     config = {
-        'dlp_id': 22,  # Set your own DLP ID here
-        'use_sealing': os.path.isdir(SEALED_DIR),
-        'input_dir': INPUT_DIR,
+        'dlp_id': 1234,
+        'use_sealing': os.path.isdir(sealed_dir),
+        'input_dir': input_dir,
         'user_email': os.environ.get('USER_EMAIL', None),
-        'token': os.environ.get('token', None),
-        'key': os.environ.get('key', None),
-        'verify': os.environ.get('verify', None),
-        'endpoint': os.environ.get('endpoint', None)
+        'token': os.environ.get('TOKEN', None),
+        'key': os.environ.get('KEY', None),
+        'verify': os.environ.get('VERIFY', None),
+        'endpoint': os.environ.get('ENDPOINT', None)
     }
     return config
 
@@ -35,7 +35,9 @@ def run() -> None:
 
     if not input_files_exist:
         raise FileNotFoundError(f"No input files found in {INPUT_DIR}")
-    extract_input()
+
+    input_file = os.path.join(config['input_dir'], os.listdir(config['input_dir'])[0])
+    new_input_file = change_and_delete_file_extension(input_file, '.txt')
 
     proof = Proof(config)
     proof_response = proof.generate()
@@ -46,17 +48,16 @@ def run() -> None:
     logging.info(f"Proof generation complete: {proof_response}")
 
 
-def extract_input() -> None:
-    """
-    If the input directory contains any zip files, extract them
-    :return:
-    """
-    for input_filename in os.listdir(INPUT_DIR):
-        input_file = os.path.join(INPUT_DIR, input_filename)
+def change_and_delete_file_extension(file_path, new_extension):
+    base = os.path.splitext(file_path)[0]
+    new_file_path = base + new_extension
 
-        if zipfile.is_zipfile(input_file):
-            with zipfile.ZipFile(input_file, 'r') as zip_ref:
-                zip_ref.extractall(INPUT_DIR)
+    os.rename(file_path, new_file_path)
+
+    if os.path.exists(file_path):
+        os.remove(file_path)
+
+    return new_file_path
 
 
 if __name__ == "__main__":

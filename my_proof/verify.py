@@ -71,21 +71,33 @@ class DbSNPHandler:
     def handle_special_cases(self, rsid_array: np.ndarray, genotype_array: np.ndarray, invalid_genotypes: List[str],
                              indels: List[str], i_rsids: List[str]) -> Tuple[List[str], List[str], List[str]]:
         """
-        This method combines the logic for handling both i-rsid and indel cases
-        by checking the rsid and genotype arrays in a single function.
+        This method handles both i-rsid and indel cases by checking the rsid and genotype arrays.
+        Identified indels are removed from the rsid array before applying the i_rsid mask, and
+        both indels and i_rsids are removed from invalid_genotypes afterward.
         """
 
-        # Vectorize the checks for i-rsid and indels
-        i_rsid_mask = np.vectorize(lambda x: self.is_i_rsid(x))(rsid_array)
+        # Step 1: Identify indels first, even for RSIDs starting with 'i'
         indel_mask = np.isin(genotype_array, ['--', 'II', 'DD'])
+        identified_indels = rsid_array[indel_mask].tolist()
+        indels.extend(identified_indels)
 
-        # Handle indels
-        indels.extend(rsid_array[indel_mask & np.isin(rsid_array, invalid_genotypes)].tolist())
-        invalid_genotypes = list(set(invalid_genotypes) - set(rsid_array[indel_mask & np.isin(rsid_array, invalid_genotypes)]))
+        # Filter out indels from rsid_array and genotype_array before applying i_rsid mask
+        rsid_array_filtered = rsid_array[~indel_mask]
+        genotype_array_filtered = genotype_array[~indel_mask]
 
-        # Handle i-rsids
-        i_rsids.extend(rsid_array[i_rsid_mask & np.isin(rsid_array, invalid_genotypes)].tolist())
-        invalid_genotypes = list(set(invalid_genotypes) - set(rsid_array[i_rsid_mask & np.isin(rsid_array, invalid_genotypes)]))
+        # Step 2: Identify i_rsids in the filtered rsid_array
+        i_rsid_mask = np.vectorize(self.is_i_rsid)(rsid_array_filtered)
+        identified_i_rsids = rsid_array_filtered[i_rsid_mask].tolist()
+        i_rsids.extend(identified_i_rsids)
+
+        # Step 3: Update invalid_genotypes by removing identified indels and i_rsids
+        not_invalid = set(indels + i_rsids)
+        invalid_genotypes = list(set(invalid_genotypes) - not_invalid)
+
+        # Step 4: Move any i-rsids from the indels list to the i_rsids list
+        i_indels = [indel for indel in indels if self.is_i_rsid(indel)]
+        i_rsids.extend(i_indels)
+        indels = [indel for indel in indels if not self.is_i_rsid(indel)]
 
         return indels, i_rsids, invalid_genotypes
 
@@ -100,7 +112,7 @@ class DbSNPHandler:
             return None, None, rsid
 
         if self.is_indel(genotype):
-            return None, genotype, None
+            return None, rsid, None
 
         return rsid, None, None
 

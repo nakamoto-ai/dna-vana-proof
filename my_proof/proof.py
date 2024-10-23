@@ -38,13 +38,15 @@ class TwentyThreeWeFileScorer:
     valid_genotypes = set("ATCG-ID")
     valid_chromosomes = set([str(i) for i in range(1, 23)] + ["X", "Y", "MT"])
 
-    def __init__(self, input_data, config):
+    def __init__(self, input_data, config, requester, hasher):
         self.input_data = input_data
         self.profile_id = self.get_profile_id(input_data)
         self.config = config
         self.proof_response = None
         self.hash = None
         self.sender_address = None
+        self.requester = requester
+        self.hasher = hasher
 
     @staticmethod
     def get_profile_id(input_data):
@@ -143,7 +145,7 @@ class TwentyThreeWeFileScorer:
         """
         self.sender_address = self.config['verify'].split('address=')[-1]
         url = f"{self.config['verify']}&profile_id={self.profile_id}"
-        response = requests.get(url=url)
+        response = self.requester.get(url=url)
         resp = response.json()
         profile_verified = resp.get('is_approved', False)
 
@@ -154,7 +156,7 @@ class TwentyThreeWeFileScorer:
         Sends the hashed genome data for verification via a POST request.
         """
         url = f"{self.config['key']}&genome_hash={genome_hash}"
-        response = requests.get(url=url)
+        response = self.requester.get(url=url)
         resp = response.json()
         hash_unique = resp.get('is_unique', False)
 
@@ -180,7 +182,7 @@ class TwentyThreeWeFileScorer:
         gc.collect()  # Force garbage collection
 
         # Hash the concatenated string using SHA-256
-        hash_object = hashlib.sha256(concatenated_string.encode())
+        hash_object = self.hasher(concatenated_string.encode())
         hash_hex = hash_object.hexdigest()
         self.hash = hash_hex
 
@@ -321,7 +323,8 @@ class Proof:
                 if input_filename.split('.')[-1] == 'txt':
                     twenty_three_file = input_file
                     input_data = [f for f in i_file]
-                    scorer = TwentyThreeWeFileScorer(input_data=input_data, config=self.config)
+                    scorer = TwentyThreeWeFileScorer(input_data=input_data, config=self.config, requester=requests,
+                                                     hasher=hashlib.sha256)
                     break
 
         score_threshold = 0.9
