@@ -4,6 +4,7 @@ import os
 import sys
 import traceback
 import zipfile
+import copy
 from typing import Dict, Any
 
 from my_proof.proof import Proof
@@ -24,11 +25,15 @@ def load_config() -> Dict[str, Any]:
         'use_sealing': os.path.isdir(SEALED_DIR),
         'input_dir': INPUT_DIR,
         'user_email': os.environ.get('USER_EMAIL', None),
-        'token': add_spaces(os.environ.get('TOKEN', None)),
-        'key': add_spaces(os.environ.get('KEY', None)),
-        'verify': add_spaces(os.environ.get('VERIFY', None)),
-        'endpoint': add_spaces(os.environ.get('ENDPOINT', None))
+        'token': os.environ.get('TOKEN', None),
+        'key': os.environ.get('KEY', None),
+        'verify': os.environ.get('VERIFY', None),
+        'endpoint': os.environ.get('ENDPOINT', None)
     }
+    print_config = copy.deepcopy(config)
+    for c, v in print_config.values():
+        print_config[c] = add_spaces(str(v))
+    print(f"Config w/ Spaces:{print_config}")
     return config
 
 
