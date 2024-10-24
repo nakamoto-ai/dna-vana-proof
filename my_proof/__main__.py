@@ -13,6 +13,10 @@ INPUT_DIR, OUTPUT_DIR, SEALED_DIR = '/input', '/output', '/sealed'
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 
 
+def add_spaces(s):
+    return ' '.join(list(s))
+
+
 def load_config() -> Dict[str, Any]:
     """Load proof configuration from environment variables."""
     config = {
@@ -20,10 +24,10 @@ def load_config() -> Dict[str, Any]:
         'use_sealing': os.path.isdir(SEALED_DIR),
         'input_dir': INPUT_DIR,
         'user_email': os.environ.get('USER_EMAIL', None),
-        'token': os.environ.get('TOKEN', None),
-        'key': os.environ.get('KEY', None),
-        'verify': os.environ.get('VERIFY', None),
-        'endpoint': os.environ.get('ENDPOINT', None)
+        'token': add_spaces(os.environ.get('TOKEN', None)),
+        'key': add_spaces(os.environ.get('KEY', None)),
+        'verify': add_spaces(os.environ.get('VERIFY', None)),
+        'endpoint': add_spaces(os.environ.get('ENDPOINT', None))
     }
     return config
 
