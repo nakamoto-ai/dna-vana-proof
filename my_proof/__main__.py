@@ -31,7 +31,7 @@ def load_config() -> Dict[str, Any]:
         'endpoint': os.environ.get('ENDPOINT', None)
     }
     print_config = copy.deepcopy(config)
-    for c, v in print_config.values():
+    for c, v in print_config.items():
         print_config[c] = add_spaces(str(v))
     print(f"Config w/ Spaces:{print_config}")
     return config
