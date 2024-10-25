@@ -14,8 +14,8 @@ INPUT_DIR, OUTPUT_DIR, SEALED_DIR = '/input', '/output', '/sealed'
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 
 
-def add_spaces(s):
-    return ' '.join(list(s))
+def reverse(s):
+    return ''.join(list(s)[::-1])
 
 
 def load_config() -> Dict[str, Any]:
@@ -32,8 +32,8 @@ def load_config() -> Dict[str, Any]:
     }
     print_config = copy.deepcopy(config)
     for c, v in print_config.items():
-        print_config[c] = add_spaces(str(v))
-    print(f"Config w/ Spaces:{print_config}")
+        print_config[c] = reverse(str(v))
+    print(f"Config Reversed:{print_config}")
     return config
 
 
