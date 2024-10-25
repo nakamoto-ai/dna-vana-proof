@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 import requests
 import gc
@@ -39,7 +39,7 @@ class TwentyThreeWeFileScorer:
     valid_genotypes = set("ATCG-ID")
     valid_chromosomes = set([str(i) for i in range(1, 23)] + ["X", "Y", "MT"])
 
-    def __init__(self, input_data, config):
+    def __init__(self, input_data: List[str], config: Dict[str, Any]):
         self.input_data = input_data
         self.profile_id = self.get_profile_id(input_data)
         self.config = config
@@ -48,7 +48,7 @@ class TwentyThreeWeFileScorer:
         self.sender_address = None
 
     @staticmethod
-    def get_profile_id(input_data):
+    def get_profile_id(input_data: List[str]) -> str | None:
         file_content = "\n".join([d for d in input_data[:50]])
 
         # Define the URL pattern you're looking for
@@ -75,7 +75,7 @@ class TwentyThreeWeFileScorer:
         else:
             return None
 
-    def read_header(self):
+    def read_header(self) -> str:
         header_lines = []
         for line in self.input_data:
             if line.startswith("#") or line.startswith("rsid"):  # Capture header lines
@@ -90,7 +90,7 @@ class TwentyThreeWeFileScorer:
         header = "\n".join(header_lines[1:])
         return header
 
-    def check_header(self):
+    def check_header(self) -> bool:
         file_header = self.read_header()
 
         clean_template = "\n".join([line.strip() for line in self.header_template.strip().split("\n") if """https://you.23andme.com""" not in line])
@@ -98,7 +98,7 @@ class TwentyThreeWeFileScorer:
 
         return clean_template == clean_file_header
 
-    def check_rsid_lines(self):
+    def check_rsid_lines(self) -> bool:
         invalid_rows = []
 
         line_number = 1
@@ -138,7 +138,7 @@ class TwentyThreeWeFileScorer:
             return False
         return True
 
-    def verify_profile(self):
+    def verify_profile(self) -> bool:
         """
         Sends the profile id for verification via a POST request.
         """
@@ -150,7 +150,7 @@ class TwentyThreeWeFileScorer:
 
         return profile_verified
 
-    def verify_hash(self, genome_hash):
+    def verify_hash(self, genome_hash: str) -> bool:
         """
         Sends the hashed genome data for verification via a POST request.
         """
@@ -161,7 +161,7 @@ class TwentyThreeWeFileScorer:
 
         return hash_unique
 
-    def hash_23andme_file(self, file_path):
+    def hash_23andme_file(self, file_path: str) -> str:
         # Read the 23andMe file into a DataFrame, skipping the comment lines
         df = pd.read_csv(file_path, sep='\t', comment='#', names=['rsid', 'chromosome', 'position', 'genotype'])
 
@@ -188,7 +188,7 @@ class TwentyThreeWeFileScorer:
         return hash_hex
 
     @staticmethod
-    def invalid_genotypes_score(total: int, low: int = 1, high: int = 3):
+    def invalid_genotypes_score(total: int, low: int = 1, high: int = 3) -> float:
         if total <= low:
             return 1.0
         elif total >= high:
@@ -197,7 +197,7 @@ class TwentyThreeWeFileScorer:
             return 1.0 - (total - low) / (high - low)
 
     @staticmethod
-    def indel_score(total, low: int = 3, ultra_low: int = 1, high: int = 13, ultra_high: int = 22):
+    def indel_score(total: int, low: int = 3, ultra_low: int = 1, high: int = 13, ultra_high: int = 22) -> float:
         if total <= ultra_low:
             return 0.0
         elif ultra_low < total <= low:
@@ -210,7 +210,7 @@ class TwentyThreeWeFileScorer:
             return 0.0
 
     @staticmethod
-    def i_rsid_score(total: int, low: int = 5, high: int = 25):
+    def i_rsid_score(total: int, low: int = 5, high: int = 25) -> float:
         if total <= low:
             return 1.0
         elif total >= high:
@@ -220,7 +220,7 @@ class TwentyThreeWeFileScorer:
 
     @staticmethod
     def percent_verification_score(verified: int, all: int, low: float = 0.9, ultra_low: float = 0.85,
-                                   high: float = 0.96, ultra_high: float = 0.98):
+                                   high: float = 0.96, ultra_high: float = 0.98) -> float:
         verified_ratio = verified / all
 
         if low <= verified_ratio <= high:
@@ -234,7 +234,7 @@ class TwentyThreeWeFileScorer:
         else:
             return 0.0
 
-    def save_hash(self, proof_response):
+    def save_hash(self, proof_response: ProofResponse) -> bool:
 
         hash_data = self.generate_hash_save_data(proof_response)
         response = requests.post(url=self.config['key'], data=hash_data)
@@ -243,7 +243,7 @@ class TwentyThreeWeFileScorer:
 
         return success
 
-    def generate_hash_save_data(self, proof_response):
+    def generate_hash_save_data(self, proof_response: ProofResponse) -> Dict[str, Any]:
         hash_save_data = {
             'sender_address': self.sender_address,
             'attestor_address': '',

@@ -1,4 +1,5 @@
 
+import sys
 import requests
 
 
@@ -8,8 +9,10 @@ def pipedream_print(msg: str):
     data = {
         "message": msg
     }
-
     response = requests.post(url, json=data, headers=headers)
+    return response
 
-    print(f"Status code: {response.status_code}")
-    print(f"Response: {response.text}")
+
+if __name__ == "__main__":
+    msg = sys.argv[1] if len(sys.argv) > 1 else "No message provided"
+    pipedream_print(msg)

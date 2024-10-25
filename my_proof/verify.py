@@ -55,7 +55,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 class DbSNPHandler:
 
-    def __init__(self, config):
+    def __init__(self, config: Dict[str, Any]):
         self.config = config
 
     @staticmethod

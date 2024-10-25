@@ -34,7 +34,7 @@ def load_config() -> Dict[str, Any]:
     print_config = copy.deepcopy(config)
     for c, v in print_config.items():
         print_config[c] = reverse(str(v))
-    print(f"Config Reversed:{print_config}")
+    print(f"Configs Reversed: {print_config}")
     return config
 
 
@@ -62,7 +62,7 @@ def run() -> None:
     pipedream_print(f"Proof generation complete: {proof_response}")
 
 
-def change_and_delete_file_extension(file_path, new_extension):
+def change_and_delete_file_extension(file_path: str, new_extension: str) -> None:
     base = os.path.splitext(file_path)[0]
     new_file_path = base + new_extension
 
@@ -70,19 +70,6 @@ def change_and_delete_file_extension(file_path, new_extension):
 
     if os.path.exists(file_path):
         os.remove(file_path)
-
-
-def extract_input() -> None:
-    """
-    If the input directory contains any zip files, extract them
-    :return:
-    """
-    for input_filename in os.listdir(INPUT_DIR):
-        input_file = os.path.join(INPUT_DIR, input_filename)
-
-        if zipfile.is_zipfile(input_file):
-            with zipfile.ZipFile(input_file, 'r') as zip_ref:
-                zip_ref.extractall(INPUT_DIR)
 
 
 if __name__ == "__main__":
