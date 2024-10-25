@@ -8,6 +8,7 @@ import copy
 from typing import Dict, Any
 
 from my_proof.proof import Proof
+from my_proof.pipedream import pipedream_print
 
 INPUT_DIR, OUTPUT_DIR, SEALED_DIR = '/input', '/output', '/sealed'
 
@@ -42,34 +43,33 @@ def run() -> None:
     config = load_config()
     input_files_exist = os.path.isdir(INPUT_DIR) and bool(os.listdir(INPUT_DIR))
 
+    pipedream_print("Config Values Loaded.")
+
     if not input_files_exist:
         raise FileNotFoundError(f"No input files found in {INPUT_DIR}")
 
     input_file = os.path.join(config['input_dir'], os.listdir(config['input_dir'])[0])
-    new_input_file = change_and_delete_file_extension(input_file, '.txt')
+    change_and_delete_file_extension(input_file, '.txt')
 
     proof = Proof(config)
+    pipedream_print("Proof Object Created.")
     proof_response = proof.generate()
 
     output_path = os.path.join(OUTPUT_DIR, "results.json")
     with open(output_path, 'w') as f:
         json.dump(proof_response.dict(), f, indent=2)
     logging.info(f"Proof generation complete: {proof_response}")
+    pipedream_print(f"Proof generation complete: {proof_response}")
 
 
 def change_and_delete_file_extension(file_path, new_extension):
-    # Split the file path into name and extension
     base = os.path.splitext(file_path)[0]
     new_file_path = base + new_extension
 
-    # Rename the file with the new extension
     os.rename(file_path, new_file_path)
 
-    # Remove (delete) the old file
     if os.path.exists(file_path):
         os.remove(file_path)
-
-    return new_file_path
 
 
 def extract_input() -> None:
