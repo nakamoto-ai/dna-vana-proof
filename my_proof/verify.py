@@ -1,61 +1,17 @@
-import sqlite3
+
 import pandas as pd
 import requests
-import time
-from functools import wraps, lru_cache
-import re
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import numpy as np
-from typing import List, Tuple, Dict, Any
-import os
+from typing import List, Tuple, Dict, Any, Optional
 import random
 from collections import defaultdict
 import gc
 import json
 
-SAMPLE_GENOME_RESPONSE = {
-  "valid": [
-    {
-      "rsid": "rs12345",
-      "genotype": ["A", "T"]
-    },
-    {
-      "rsid": "rs67890",
-      "genotype": ["G", "C"]
-    },
-    {
-      "rsid": "rs13579",
-      "genotype": ["C", "G"]
-    }
-  ],
-  "invalid": [
-    {
-      "rsid": "rs12345",
-      "genotype": ["A", "T"]
-    },
-    {
-      "rsid": "rs67890",
-      "genotype": ["G", "C"]
-    },
-    {
-      "rsid": "rs13579",
-      "genotype": ["C", "G"]
-    }
-  ]
-}
-
-
-import sqlite3
-import time
-from functools import wraps
-import re
-from typing import List, Tuple
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
 
 class DbSNPHandler:
 
-    def __init__(self, config):
+    def __init__(self, config: Dict[str, Any]):
         self.config = config
 
     @staticmethod
@@ -76,25 +32,19 @@ class DbSNPHandler:
         both indels and i_rsids are removed from invalid_genotypes afterward.
         """
 
-        # Step 1: Identify indels first, even for RSIDs starting with 'i'
         indel_mask = np.isin(genotype_array, ['--', 'II', 'DD'])
         identified_indels = rsid_array[indel_mask].tolist()
         indels.extend(identified_indels)
 
-        # Filter out indels from rsid_array and genotype_array before applying i_rsid mask
         rsid_array_filtered = rsid_array[~indel_mask]
-        genotype_array_filtered = genotype_array[~indel_mask]
 
-        # Step 2: Identify i_rsids in the filtered rsid_array
         i_rsid_mask = np.vectorize(self.is_i_rsid)(rsid_array_filtered)
         identified_i_rsids = rsid_array_filtered[i_rsid_mask].tolist()
         i_rsids.extend(identified_i_rsids)
 
-        # Step 3: Update invalid_genotypes by removing identified indels and i_rsids
         not_invalid = set(indels + i_rsids)
         invalid_genotypes = list(set(invalid_genotypes) - not_invalid)
 
-        # Step 4: Move any i-rsids from the indels list to the i_rsids list
         i_indels = [indel for indel in indels if self.is_i_rsid(indel)]
         i_rsids.extend(i_indels)
         indels = [indel for indel in indels if not self.is_i_rsid(indel)]
@@ -122,14 +72,11 @@ class DbSNPHandler:
         Checks for both indels and i-rsids by leveraging the `handle_special_cases` function.
         """
 
-        # Convert lists to arrays for vectorized operations
         rsid_array = np.array(rsid_list)
         genotype_array = np.array(genotype_list)
 
-        # Check for special cases and update the indels, i_rsids, and invalid genotypes
         indels, i_rsids, invalid_genotypes = self.handle_special_cases(rsid_array, genotype_array, invalid_genotypes, indels, i_rsids)
 
-        # Return the summary information
         dna_info = {
             'indels': len(indels),
             'i_rsids': len(i_rsids),
@@ -139,7 +86,8 @@ class DbSNPHandler:
 
         return dna_info
 
-    def verify_snps(self, df: pd.DataFrame) -> Tuple[List[str | None]]:
+    def verify_snps(self, df: pd.DataFrame)\
+            -> Tuple[List[Optional[str]], List[Optional[str]], List[Optional[str]], List[Optional[str]]]:
         """
         Verifies SNPs by checking for invalid, indels, and i-rsids cases.
         """
@@ -175,12 +123,10 @@ class DbSNPHandler:
         genotype_list = df['genotype'].tolist()
         chromosomes = df['chromosome'].tolist()
 
-        # Step 1: Group items by chromosome
         grouped_data = defaultdict(list)
         for rsid, genotype, chrom in zip(rsid_list, genotype_list, chromosomes):
             grouped_data[chrom].append((rsid, genotype))
 
-        # Step 2: For each chromosome (1-23, X, Y, MT), select up to 10 items
         sampled_rsids = []
         chromosome_names = [str(i) for i in range(1, 23)] + ['X', 'Y', 'MT']
 
@@ -189,7 +135,7 @@ class DbSNPHandler:
                 selected_items = random.sample(grouped_data[chrom], min(10, len(grouped_data[chrom])))
 
                 for rsid, genotype in selected_items:
-                    allele_list = list(set(genotype))  # Convert genotype to a set to remove duplicates
+                    allele_list = list(set(genotype))
 
                     item_dict = {
                         'rsid': rsid,
@@ -221,7 +167,7 @@ class DbSNPHandler:
         """
         Loads the data from the file into a pandas DataFrame.
         """
-        return pd.read_csv(filepath, comment='#', sep='\s+', names=['rsid', 'chromosome', 'position', 'genotype'],
+        return pd.read_csv(filepath, comment='#', sep=r'\s+', names=['rsid', 'chromosome', 'position', 'genotype'],
                            dtype={'rsid': str, 'chromosome': str, 'position': int, 'genotype': str})
 
     def filter_valid_chromosomes(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, List[str], List[str]]:
@@ -275,13 +221,3 @@ class DbSNPHandler:
         gc.collect()
 
         return dna_info
-
-
-if __name__ == '__main__':
-    handler = DbSNPHandler()
-
-    filepath = '23andme_raw_data.txt'
-    print(handler.dbsnp_verify(filepath))
-    print_cumulative_times()
-
-    verifier.close_connection()

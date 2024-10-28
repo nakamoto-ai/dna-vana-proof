@@ -1,7 +1,9 @@
 
 import pytest
+from unittest import mock
 from unittest.mock import MagicMock, patch
-from collections import defaultdict
+from dataclasses import dataclass
+from typing import List, Dict, Any, Tuple
 from io import StringIO
 import numpy as np
 import numpy.testing as npt
@@ -10,14 +12,13 @@ import json
 
 from my_proof.proof import DbSNPHandler
 
-from .conftest import mock_hasher, mock_requester
-
-from .data_tables import (IsIRsidTestData, IsIndelTestData, HandleSpecialCasesTestData, VerifySNPTestData,
-                          CheckIndelsAndIRsidsTestData, SampledRSIDTestData, VerifyGenomeTestData, LoadDataTestData,
-                          FilterChromosomesTestData, CheckGenotypesTestData, DbsnpVerifyTestData, VerifySNPsTestData)
-
 
 class TestDbSNPHandler:
+
+    @dataclass
+    class IsIRsidTestData:
+        rsid: str
+        expected_is_i_rsid: bool
 
     @pytest.mark.parametrize("input_data", [
         IsIRsidTestData(rsid="i12345", expected_is_i_rsid=True),
@@ -26,9 +27,14 @@ class TestDbSNPHandler:
         IsIRsidTestData(rsid="i00001", expected_is_i_rsid=True),
         IsIRsidTestData(rsid="x12345", expected_is_i_rsid=False)
     ])
-    def test_is_i_rsid(self, input_data):
+    def test_is_i_rsid(self, input_data: IsIRsidTestData) -> None:
         result = DbSNPHandler.is_i_rsid(input_data.rsid)
         assert result == input_data.expected_is_i_rsid
+
+    @dataclass
+    class IsIndelTestData:
+        genotype: str
+        expected_is_indel: bool
 
     @pytest.mark.parametrize("input_data", [
         IsIndelTestData(genotype="--", expected_is_indel=True),
@@ -39,14 +45,25 @@ class TestDbSNPHandler:
         IsIndelTestData(genotype="Ii", expected_is_indel=True),
         IsIndelTestData(genotype="Dd", expected_is_indel=True)
     ])
-    def test_is_indel(self, input_data):
+    def test_is_indel(self, input_data: IsIndelTestData) -> None:
         result = DbSNPHandler.is_indel(input_data.genotype)
         assert result == input_data.expected_is_indel
+
+    @dataclass
+    class HandleSpecialCasesTestData:
+        rsid_array: np.ndarray
+        genotype_array: np.ndarray
+        invalid_genotypes: List[str]
+        indels: List[str]
+        i_rsids: List[str]
+        expected_indels: List[str]
+        expected_i_rsids: List[str]
+        expected_invalid_genotypes: List[str]
 
     @pytest.mark.parametrize("input_data", [
         HandleSpecialCasesTestData(
             rsid_array=np.array(["rs1", "i123", "rs3"]),
-            genotype_array=np.array(["AA", "--", "DD"]),
+            genotype_array=np.array(["AA", "TT", "DD"]),
             invalid_genotypes=["rs1", "rs3"],
             indels=[],
             i_rsids=[],
@@ -56,7 +73,7 @@ class TestDbSNPHandler:
         ),
         HandleSpecialCasesTestData(
             rsid_array=np.array(["rs2", "i456", "rs5"]),
-            genotype_array=np.array(["GG", "II", "AA"]),
+            genotype_array=np.array(["GG", "CC", "AA"]),
             invalid_genotypes=["rs2", "i456"],
             indels=[],
             i_rsids=[],
@@ -75,7 +92,7 @@ class TestDbSNPHandler:
             expected_invalid_genotypes=[]
         )
     ])
-    def test_handle_special_cases(self, input_data):
+    def test_handle_special_cases(self, input_data: HandleSpecialCasesTestData) -> None:
         scorer = DbSNPHandler(config={})
 
         indels, i_rsids, invalid_genotypes = scorer.handle_special_cases(
@@ -89,6 +106,14 @@ class TestDbSNPHandler:
         assert indels == input_data.expected_indels
         assert i_rsids == input_data.expected_i_rsids
         assert invalid_genotypes == input_data.expected_invalid_genotypes
+
+    @dataclass
+    class VerifySNPTestData:
+        rsid: str | None
+        genotype: str
+        expected_rsid: str | None
+        expected_indel: str | None
+        expected_i_rsid: str | None
 
     @pytest.mark.parametrize("input_data", [
         VerifySNPTestData(
@@ -112,7 +137,7 @@ class TestDbSNPHandler:
             expected_rsid=None, expected_indel="rs5", expected_i_rsid=None
         )
     ])
-    def test_verify_snp(self, input_data):
+    def test_verify_snp(self, input_data: VerifySNPTestData) -> None:
         scorer = DbSNPHandler(config={})
 
         result_rsid, result_indel, result_i_rsid = scorer.verify_snp(
@@ -122,6 +147,11 @@ class TestDbSNPHandler:
         assert result_rsid == input_data.expected_rsid
         assert result_indel == input_data.expected_indel
         assert result_i_rsid == input_data.expected_i_rsid
+
+    @dataclass
+    class SampledRSIDTestData:
+        df: pd.DataFrame
+        expected_sampled_rsids: List[Dict[str, str | List[str]]]
 
     @pytest.mark.parametrize("input_data", [
         SampledRSIDTestData(
@@ -164,13 +194,18 @@ class TestDbSNPHandler:
             ]
         ),
     ])
-    def test_get_sampled_rsids(self, input_data):
+    def test_get_sampled_rsids(self, input_data: SampledRSIDTestData) -> None:
         scorer = DbSNPHandler(config={})
 
         result_sampled_rsids = scorer.get_sampled_rsids(input_data.df)
 
         assert sorted(result_sampled_rsids, key=lambda x: x['rsid']) == sorted(input_data.expected_sampled_rsids,
                                                                                key=lambda x: x['rsid'])
+
+    @dataclass
+    class VerifyGenomeTestData:
+        final_list: List[Dict[str, str | List[str]]]
+        expected_response: Dict[str, List[Dict[str, str | List[str]]]]
 
     @pytest.mark.parametrize("input_data", [
         VerifyGenomeTestData(
@@ -187,23 +222,19 @@ class TestDbSNPHandler:
         ),
     ])
     @patch("requests.get")
-    def test_verify_genome(self, mock_get, input_data):
-        # Mocking the response of requests.get
+    def test_verify_genome(self, mock_get: mock.MagicMock, input_data: VerifyGenomeTestData) -> None:
         mock_response = MagicMock()
         mock_response.json.return_value = input_data.expected_response
         mock_get.return_value = mock_response
 
-        # Config for the handler
         config = {
             'token': 'test-token',
             'endpoint': 'http://fake-endpoint.com/verify'
         }
         scorer = DbSNPHandler(config=config)
 
-        # Call the method
         result = scorer.verify_genome(input_data.final_list)
 
-        # Verify the request was made with correct data
         mock_get.assert_called_once_with(
             url=config['endpoint'],
             data=json.dumps({'genomes': input_data.final_list}),
@@ -213,8 +244,12 @@ class TestDbSNPHandler:
             }
         )
 
-        # Assert the response matches the expected response
         assert result == input_data.expected_response
+
+    @dataclass
+    class LoadDataTestData:
+        sample_data: str
+        expected_df: pd.DataFrame
 
     @pytest.mark.parametrize("input_data", [
         LoadDataTestData(
@@ -258,13 +293,20 @@ class TestDbSNPHandler:
             })
         )
     ])
-    def test_load_data(self, input_data):
+    def test_load_data(self, input_data: LoadDataTestData) -> None:
         file_like_object = StringIO(input_data.sample_data.strip())
 
         scorer = DbSNPHandler(config={})
         result_df = scorer.load_data(filepath=file_like_object)
 
         pd.testing.assert_frame_equal(result_df, input_data.expected_df)
+
+    @dataclass
+    class FilterChromosomesTestData:
+        input_df: pd.DataFrame
+        expected_df_valid: pd.DataFrame
+        expected_invalid_chromosomes: List[str]
+        expected_missing_chromosomes: List[str]
 
     @pytest.mark.parametrize("input_data", [
         FilterChromosomesTestData(
@@ -302,7 +344,7 @@ class TestDbSNPHandler:
                                           '15', '16', '17', '18', '19', '20', '21', '22', 'X']
         )
     ])
-    def test_filter_valid_chromosomes(self, input_data):
+    def test_filter_valid_chromosomes(self, input_data: FilterChromosomesTestData) -> None:
         scorer = DbSNPHandler(config={})
 
         df_valid, invalid_chromosomes, missing_chromosomes = scorer.filter_valid_chromosomes(input_data.input_df)
@@ -313,6 +355,13 @@ class TestDbSNPHandler:
         pd.testing.assert_frame_equal(df_valid, expected_df_valid)
         assert invalid_chromosomes == input_data.expected_invalid_chromosomes
         assert sorted(missing_chromosomes) == sorted(input_data.expected_missing_chromosomes)
+
+    @dataclass
+    class CheckGenotypesTestData:
+        input_df_valid: pd.DataFrame
+        mock_verify_snps_output: Tuple[List[str], List[str], List[str], List[str]]
+        mock_check_indels_and_i_rsids_output: Dict[str, int | List[Any]]
+        expected_output: Dict[str, int | List[Any]]
 
     @pytest.mark.parametrize("input_data", [
         CheckGenotypesTestData(
@@ -370,7 +419,9 @@ class TestDbSNPHandler:
     ])
     @patch.object(DbSNPHandler, 'verify_snps')
     @patch.object(DbSNPHandler, 'check_indels_and_i_rsids')
-    def test_check_genotypes(self, mock_check_indels_and_i_rsids, mock_verify_snps, input_data):
+    def test_check_genotypes(self, mock_check_indels_and_i_rsids: mock.MagicMock, mock_verify_snps: mock.MagicMock,
+                             input_data: CheckGenotypesTestData) -> None:
+
         scorer = DbSNPHandler(config={})
 
         mock_verify_snps.return_value = input_data.mock_verify_snps_output
@@ -389,6 +440,14 @@ class TestDbSNPHandler:
 
         assert result == input_data.expected_output
 
+    @dataclass
+    class DbsnpVerifyTestData:
+        filepath: str
+        mock_load_data_output: pd.DataFrame
+        mock_filter_valid_chromosomes_output: Tuple[pd.DataFrame, List[str], List[str]]
+        mock_check_genotypes_output: Dict[str, Any]
+        expected_output: Dict[str, Any]
+
     @pytest.mark.parametrize("input_data", [
         DbsnpVerifyTestData(
             filepath="test_data_1.txt",
@@ -405,9 +464,9 @@ class TestDbSNPHandler:
                         'position': [1000, 3000],
                         'genotype': ['AA', '--']
                     }),
-                    ['25'],  # Invalid chromosomes
+                    ['25'],
                     ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19',
-                     '20', '21', '22', 'X', 'Y']  # Missing chromosomes
+                     '20', '21', '22', 'X', 'Y']
             ),
             mock_check_genotypes_output={
                 'indels': 1,
@@ -442,9 +501,9 @@ class TestDbSNPHandler:
                         'position': [4000, 5000],
                         'genotype': ['TT', 'GG']
                     }),
-                    [],  # Invalid chromosomes
+                    [],
                     ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18',
-                     '19', '20', '21', '22', 'MT']  # Missing chromosomes
+                     '19', '20', '21', '22', 'MT']
             ),
             mock_check_genotypes_output={
                 'indels': 0,
@@ -469,8 +528,9 @@ class TestDbSNPHandler:
     @patch.object(DbSNPHandler, 'filter_valid_chromosomes')
     @patch.object(DbSNPHandler, 'check_genotypes')
     @patch('gc.collect')
-    def test_dbsnp_verify(self, mock_gc_collect, mock_check_genotypes, mock_filter_valid_chromosomes, mock_load_data,
-                          input_data):
+    def test_dbsnp_verify(self, mock_gc_collect: mock.MagicMock, mock_check_genotypes: mock.MagicMock,
+                          mock_filter_valid_chromosomes: mock.MagicMock, mock_load_data: mock.MagicMock,
+                          input_data: DbsnpVerifyTestData) -> None:
         scorer = DbSNPHandler(config={})
 
         mock_load_data.return_value = input_data.mock_load_data_output
@@ -486,6 +546,16 @@ class TestDbSNPHandler:
 
         assert result == input_data.expected_output
 
+    @dataclass
+    class CheckIndelsAndIRsidsTestData:
+        rsid_list: List[str]
+        genotype_list: List[str]
+        invalid_genotypes: List[str]
+        indels: List[str]
+        i_rsids: List[str]
+        mock_handle_special_cases_output: Tuple[List[str], List[str], List[str]]
+        expected_output: Dict[str, int | List[Any]]
+
     @pytest.mark.parametrize("input_data", [
         CheckIndelsAndIRsidsTestData(
             rsid_list=['rs1', 'rs2', 'rs3'],
@@ -494,9 +564,9 @@ class TestDbSNPHandler:
             indels=['rs2'],
             i_rsids=['rs3'],
             mock_handle_special_cases_output=(
-                    ['rs2'],  # indels
-                    ['rs3'],  # i_rsids
-                    ['rs2']  # invalid_genotypes
+                    ['rs2'],
+                    ['rs3'],
+                    ['rs2']
             ),
             expected_output={
                 'indels': 1,
@@ -512,9 +582,9 @@ class TestDbSNPHandler:
             indels=[],
             i_rsids=[],
             mock_handle_special_cases_output=(
-                    [],  # indels
-                    [],  # i_rsids
-                    []  # invalid_genotypes
+                    [],
+                    [],
+                    []
             ),
             expected_output={
                 'indels': 0,
@@ -525,13 +595,12 @@ class TestDbSNPHandler:
         )
     ])
     @patch.object(DbSNPHandler, 'handle_special_cases')
-    def test_check_indels_and_i_rsids(self, mock_handle_special_cases, input_data):
+    def test_check_indels_and_i_rsids(self, mock_handle_special_cases: mock.MagicMock,
+                                      input_data: CheckIndelsAndIRsidsTestData) -> None:
         scorer = DbSNPHandler(config={})
 
-        # Mock the output of handle_special_cases
         mock_handle_special_cases.return_value = input_data.mock_handle_special_cases_output
 
-        # Call the method
         result = scorer.check_indels_and_i_rsids(
             rsid_list=input_data.rsid_list,
             genotype_list=input_data.genotype_list,
@@ -540,24 +609,27 @@ class TestDbSNPHandler:
             i_rsids=input_data.i_rsids
         )
 
-        # Assertions for arguments passed to mock_handle_special_cases
         rsid_array = np.array(input_data.rsid_list)
         genotype_array = np.array(input_data.genotype_list)
 
-        # Extract the actual arguments passed to the mock
         called_args = mock_handle_special_cases.call_args[0]
 
-        # Compare the numpy arrays correctly
         npt.assert_array_equal(called_args[0], rsid_array)
         npt.assert_array_equal(called_args[1], genotype_array)
 
-        # Compare the remaining lists (non-numpy)
         assert called_args[2] == input_data.invalid_genotypes
         assert called_args[3] == input_data.indels
         assert called_args[4] == input_data.i_rsids
 
-        # Assert the output
         assert result == input_data.expected_output
+
+    @dataclass
+    class VerifySNPsTestData:
+        input_df: pd.DataFrame
+        mock_get_sampled_rsids_output: List[Dict[str, str | List[str]]]
+        mock_verify_genome_output: Dict[str, List[Dict[str, str | List[str]]]]
+        mock_verify_snp_output: List[Tuple[None | str, None | str, None | str]]
+        expected_output: Tuple[List[str | None], List[str], List[str], List[str]]
 
     @pytest.mark.parametrize("input_data", [
         VerifySNPsTestData(
@@ -577,13 +649,13 @@ class TestDbSNPHandler:
                 'invalid': [{'rsid': 'rs3', 'genotype': ['--']}]
             },
             mock_verify_snp_output=[
-                (None, 'rs3', None)  # indel detected for 'rs3'
+                (None, 'rs3', None)
             ],
             expected_output=(
-                    [{'rsid': 'rs1', 'genotype': ['A']}],  # valid results
-                    [],  # skipped rsids
-                    ['rs3'],  # indels
-                    []  # i_rsids
+                    [{'rsid': 'rs1', 'genotype': ['A']}],
+                    [],
+                    ['rs3'],
+                    []
             )
         ),
         VerifySNPsTestData(
@@ -603,31 +675,30 @@ class TestDbSNPHandler:
                 'invalid': [{'rsid': 'i123', 'genotype': ['T']}]
             },
             mock_verify_snp_output=[
-                (None, None, 'i123')  # i-rsid detected for 'i123'
+                (None, None, 'i123')
             ],
             expected_output=(
-                    [{'rsid': 'rs4', 'genotype': ['T']}],  # valid results
-                    [],  # skipped rsids
-                    [],  # indels
-                    ['i123']  # i_rsids
+                    [{'rsid': 'rs4', 'genotype': ['T']}],
+                    [],
+                    [],
+                    ['i123']
             )
         )
     ])
     @patch.object(DbSNPHandler, 'get_sampled_rsids')
     @patch.object(DbSNPHandler, 'verify_genome')
     @patch.object(DbSNPHandler, 'verify_snp')
-    def test_verify_snps(self, mock_verify_snp, mock_verify_genome, mock_get_sampled_rsids, input_data):
+    def test_verify_snps(self, mock_verify_snp: mock.MagicMock, mock_verify_genome: mock.MagicMock,
+                         mock_get_sampled_rsids: mock.MagicMock, input_data: VerifySNPsTestData) -> None:
+
         scorer = DbSNPHandler(config={})
 
-        # Mock the outputs of the methods
         mock_get_sampled_rsids.return_value = input_data.mock_get_sampled_rsids_output
         mock_verify_genome.return_value = input_data.mock_verify_genome_output
         mock_verify_snp.side_effect = input_data.mock_verify_snp_output
 
-        # Call the method
         result = scorer.verify_snps(input_data.input_df)
 
-        # Assertions
         mock_get_sampled_rsids.assert_called_once_with(input_data.input_df)
         mock_verify_genome.assert_called_once_with(input_data.mock_get_sampled_rsids_output)
 
@@ -638,5 +709,3 @@ class TestDbSNPHandler:
             mock_verify_snp.assert_any_call(rsid, genotype)
 
         assert result == input_data.expected_output
-
-

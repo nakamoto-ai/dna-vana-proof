@@ -3,3 +3,4 @@ pandas
 requests
 pytest
 pytest-mock
+coverage

@@ -1,9 +1,9 @@
+
 import json
 import logging
 import os
 import sys
 import traceback
-import zipfile
 from typing import Dict, Any
 
 from my_proof.proof import Proof
@@ -37,7 +37,7 @@ def run() -> None:
         raise FileNotFoundError(f"No input files found in {INPUT_DIR}")
 
     input_file = os.path.join(config['input_dir'], os.listdir(config['input_dir'])[0])
-    new_input_file = change_and_delete_file_extension(input_file, '.txt')
+    change_and_delete_file_extension(input_file, '.txt')
 
     proof = Proof(config)
     proof_response = proof.generate()
@@ -48,7 +48,7 @@ def run() -> None:
     logging.info(f"Proof generation complete: {proof_response}")
 
 
-def change_and_delete_file_extension(file_path, new_extension):
+def change_and_delete_file_extension(file_path: str, new_extension: str) -> str:
     base = os.path.splitext(file_path)[0]
     new_file_path = base + new_extension
 
