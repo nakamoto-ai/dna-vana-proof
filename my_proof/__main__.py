@@ -1,10 +1,9 @@
+
 import json
 import logging
 import os
 import sys
 import traceback
-import zipfile
-import copy
 from typing import Dict, Any
 
 from my_proof.proof import Proof
@@ -19,12 +18,12 @@ def reverse(s):
     return ''.join(list(s)[::-1])
 
 
-def load_config() -> Dict[str, Any]:
+def load_config(input_dir=INPUT_DIR, sealed_dir=SEALED_DIR) -> Dict[str, Any]:
     """Load proof configuration from environment variables."""
     config = {
-        'dlp_id': 22,  # Set your own DLP ID here
-        'use_sealing': os.path.isdir(SEALED_DIR),
-        'input_dir': INPUT_DIR,
+        'dlp_id': 1234,
+        'use_sealing': os.path.isdir(sealed_dir),
+        'input_dir': input_dir,
         'user_email': os.environ.get('USER_EMAIL', None),
         'token': os.environ.get('TOKEN', None),
         'key': os.environ.get('KEY', None),
@@ -66,10 +65,17 @@ def change_and_delete_file_extension(file_path: str, new_extension: str) -> None
     base = os.path.splitext(file_path)[0]
     new_file_path = base + new_extension
 
+
+def change_and_delete_file_extension(file_path: str, new_extension: str) -> str:
+    base = os.path.splitext(file_path)[0]
+    new_file_path = base + new_extension
+
     os.rename(file_path, new_file_path)
 
     if os.path.exists(file_path):
         os.remove(file_path)
+
+    return new_file_path
 
 
 if __name__ == "__main__":
