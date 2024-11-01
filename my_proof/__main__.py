@@ -20,9 +20,8 @@ def reverse(s):
 
 
 def load_config() -> Dict[str, Any]:
-    """Load proof configuration from environment variables."""
     config = {
-        'dlp_id': 22,  # Set your own DLP ID here
+        'dlp_id': 22,
         'use_sealing': os.path.isdir(SEALED_DIR),
         'input_dir': INPUT_DIR,
         'user_email': os.environ.get('USER_EMAIL', None),
@@ -39,7 +38,6 @@ def load_config() -> Dict[str, Any]:
 
 
 def run() -> None:
-    """Generate proofs for all input files."""
     config = load_config()
     input_files_exist = os.path.isdir(INPUT_DIR) and bool(os.listdir(INPUT_DIR))
 
