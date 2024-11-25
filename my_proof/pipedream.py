@@ -4,7 +4,11 @@ import requests
 
 
 def pipedream_print(msg: str):
-    url = "https://eoipxj5xgopiaqq.m.pipedream.net/"
+    """
+    For external logging, swap out 'url' for your pipedream endpoint and
+    use pipedream_print() like you would logging.info() or print()
+    """
+    url = "https://some-url.m.pipedream.net/"  # Add your custom pipedream url here
     headers = {'Content-Type': 'application/json'}
     data = {
         "message": msg

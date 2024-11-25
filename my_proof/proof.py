@@ -12,7 +12,6 @@ import math
 import json
 
 from my_proof.models.proof_response import ProofResponse
-from my_proof.pipedream import pipedream_print
 from .verify import DbSNPHandler
 
 
@@ -251,11 +250,7 @@ class TwentyThreeWeFileScorer:
 
     def proof_of_ownership(self) -> float:
 
-        pipedream_print("Verifying profile id...")
-
         validated = self.verify_profile()
-
-        pipedream_print("Profile ID checked.")
 
         if validated:
             return 1.0
@@ -264,15 +259,8 @@ class TwentyThreeWeFileScorer:
 
     def proof_of_quality(self, filepath) -> float:
 
-        pipedream_print("Generating quality score...")
-
         dbsnp = DbSNPHandler(self.config)
-
-        pipedream_print("dbSNP Handler Object Created. Starting Genome Verification...")
-
         results = dbsnp.dbsnp_verify(filepath)
-
-        pipedream_print("Genome verification complete. Generating Invalid/Indel/I-RSID/PercentVerify Scores...")
 
         invalid_score = self.invalid_genotypes_score(results['invalid_genotypes'])
         indel_score = self.indel_score(results['indels'])
@@ -284,16 +272,8 @@ class TwentyThreeWeFileScorer:
         return quality_score
 
     def proof_of_uniqueness(self, filepath) -> float:
-
-        pipedream_print("Generating Uniqueness Score...")
-
         hashed_dna = self.hash_23andme_file(filepath)
-
-        pipedream_print("DNA File Hashed. Verifying Hash...")
-
         unique = self.verify_hash(hashed_dna)
-
-        pipedream_print("Hash Request Complete.")
 
         if unique:
             return 1.0
@@ -301,15 +281,8 @@ class TwentyThreeWeFileScorer:
             return 0
 
     def proof_of_authenticity(self) -> float:
-        pipedream_print("Scoring Authenticity...")
-
         header_ok = self.check_header()
-
-        pipedream_print("DNA File Header Checked.")
-
         rsids_ok = self.check_rsid_lines()
-
-        pipedream_print("DNA File RSID Lines Checked.")
 
         if header_ok and rsids_ok:
             return 1.0
@@ -324,7 +297,6 @@ class Proof:
 
     def generate(self) -> ProofResponse:
         logging.info("Starting proof generation")
-        pipedream_print("Starting Proof Generation...")
 
         input_filename = os.listdir(self.config['input_dir'])[0]
         input_file = os.path.join(self.config['input_dir'], input_filename)
@@ -333,8 +305,6 @@ class Proof:
             input_data = [f for f in i_file]
             scorer = TwentyThreeWeFileScorer(input_data=input_data, config=self.config)
 
-        pipedream_print("File Scorer Object Created. Generating Proof Scores...")
-
         score_threshold = 0.9
 
         self.proof_response.uniqueness = scorer.proof_of_uniqueness(filepath=twenty_three_file)
@@ -342,14 +312,10 @@ class Proof:
         self.proof_response.authenticity = scorer.proof_of_authenticity()
         self.proof_response.quality = scorer.proof_of_quality(filepath=twenty_three_file)
 
-        pipedream_print("Proof Scores Generated. Calculating Total Score...")
-
         total_score = (0.25 * self.proof_response.quality + 0.25 * self.proof_response.ownership +
                        0.25 * self.proof_response.authenticity + 0.25 * self.proof_response.uniqueness)
         self.proof_response.score = total_score
         self.proof_response.valid = total_score >= score_threshold
-
-        pipedream_print("Total Score Calculated. Completing Proof Response Object...")
 
         self.proof_response.attributes = {
             'total_score': total_score,
@@ -360,15 +326,11 @@ class Proof:
             'dlp_id': self.config['dlp_id'],
         }
 
-        pipedream_print("Saving Hash...")
-
         save_successful = scorer.save_hash(self.proof_response)
 
         if save_successful:
             print("Hash Data Saved Successfully.")
-            pipedream_print("Hash Saved. Proof Response Complete.")
         else:
-            pipedream_print("Hash Data Saving Failed.")
             raise Exception("Hash Data Saving Failed.")
 
         return self.proof_response

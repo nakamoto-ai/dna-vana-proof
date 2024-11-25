@@ -8,7 +8,6 @@ import copy
 from typing import Dict, Any
 
 from my_proof.proof import Proof
-from my_proof.pipedream import pipedream_print
 
 INPUT_DIR, OUTPUT_DIR, SEALED_DIR = '/input', '/output', '/sealed'
 
@@ -41,8 +40,6 @@ def run() -> None:
     config = load_config()
     input_files_exist = os.path.isdir(INPUT_DIR) and bool(os.listdir(INPUT_DIR))
 
-    pipedream_print("Config Values Loaded.")
-
     if not input_files_exist:
         raise FileNotFoundError(f"No input files found in {INPUT_DIR}")
 
@@ -50,14 +47,12 @@ def run() -> None:
     change_and_delete_file_extension(input_file, '.txt')
 
     proof = Proof(config)
-    pipedream_print("Proof Object Created.")
     proof_response = proof.generate()
 
     output_path = os.path.join(OUTPUT_DIR, "results.json")
     with open(output_path, 'w') as f:
         json.dump(proof_response.dict(), f, indent=2)
     logging.info(f"Proof generation complete: {proof_response}")
-    pipedream_print(f"Proof generation complete: {proof_response}")
 
 
 def change_and_delete_file_extension(file_path: str, new_extension: str) -> None:
