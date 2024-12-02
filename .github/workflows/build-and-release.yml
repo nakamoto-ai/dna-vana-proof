@@ -24,6 +24,19 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
 
+    - name: Set up Meson (specific commit)
+      run: |
+        # Clone the Meson repository
+        git clone https://github.com/mesonbuild/meson.git
+        cd meson
+        # Check out the specific commit
+        git checkout 187ef425f96b9ba091edce56e9491373c51b2a34
+        # Install Meson
+        python3 -m pip install --upgrade .
+
+    - name: Verify Meson Version
+      run: meson --version
+
     - name: Build Docker image
       uses: docker/build-push-action@v4
       with:
