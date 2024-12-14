@@ -20,7 +20,7 @@ def reverse(s):
 
 def load_config() -> Dict[str, Any]:
     config = {
-        'dlp_id': 22,
+        'dlp_id': 2,
         'input_dir': INPUT_DIR,
         'user_email': os.environ.get('USER_EMAIL', None),
         'token': os.environ.get('TOKEN', None),
