@@ -3,7 +3,6 @@ import logging
 import os
 import sys
 import traceback
-import zipfile
 import copy
 from typing import Dict, Any
 

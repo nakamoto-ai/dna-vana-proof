@@ -299,6 +299,10 @@ class Proof:
         logging.info("Starting proof generation")
 
         input_filename = os.listdir(self.config['input_dir'])[0]
+        input_print = input_filename.split('.')
+        print("PART: \n")
+        for ip in input_print:
+            print(ip)
         input_file = os.path.join(self.config['input_dir'], input_filename)
         with open(input_file, 'r') as i_file:
             twenty_three_file = input_file
