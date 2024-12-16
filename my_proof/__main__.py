@@ -41,6 +41,8 @@ def run() -> None:
     if not input_files_exist:
         raise FileNotFoundError(f"No input files found in {INPUT_DIR}")
 
+    change_filename_if_zip()
+
     proof = Proof(config)
     proof_response = proof.generate()
 
@@ -48,6 +50,18 @@ def run() -> None:
     with open(output_path, 'w') as f:
         json.dump(proof_response.dict(), f, indent=2)
     logging.info(f"Proof generation complete: {proof_response}")
+
+
+def change_filename_if_zip():
+    input_file = [f for f in os.listdir(INPUT_DIR) if os.path.isfile(os.path.join(INPUT_DIR, f))][0]
+    filepath = os.path.join(INPUT_DIR, input_file)
+
+    if filepath.lower().endswith(".zip"):
+        new_file_path = os.path.splitext(filepath)[0] + ".txt"
+        os.rename(filepath, new_file_path)
+        return f"Input file renamed to: {new_file_path}"
+    else:
+        return "Input file is not a ZIP file."
 
 
 if __name__ == "__main__":
