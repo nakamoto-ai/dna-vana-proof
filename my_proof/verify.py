@@ -227,6 +227,3 @@ if __name__ == '__main__':
 
     filepath = '23andme_raw_data.txt'
     print(handler.dbsnp_verify(filepath))
-    print_cumulative_times()
-
-    verifier.close_connection()

@@ -294,6 +294,33 @@ class Proof:
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.proof_response = ProofResponse(dlp_id=config['dlp_id'])
+        self.proof_response.authenticity = 0
+        self.proof_response.ownership = 0
+        self.proof_response.uniqueness = 0
+        self.proof_response.quality = 0
+
+    def update_proof_response(self, scorer: TwentyThreeWeFileScorer, twenty_three_file: str):
+        self.proof_response.authenticity = scorer.proof_of_authenticity()
+        if self.proof_response.authenticity <= 0:
+            return
+
+        self.proof_response.ownership = scorer.proof_of_ownership()
+        if self.proof_response.ownership <= 0:
+            self.reset_scores()
+            return
+
+        self.proof_response.uniqueness = scorer.proof_of_uniqueness(filepath=twenty_three_file)
+        if self.proof_response.uniqueness <= 0:
+            self.reset_scores()
+            return
+
+        self.proof_response.quality = scorer.proof_of_quality(filepath=twenty_three_file)
+
+    def reset_scores(self):
+        self.proof_response.authenticity = 0
+        self.proof_response.uniqueness = 0
+        self.proof_response.ownership = 0
+        self.proof_response.quality = 0
 
     def generate(self) -> ProofResponse:
         logging.info("Starting proof generation")
@@ -311,13 +338,15 @@ class Proof:
 
         score_threshold = 0.9
 
-        self.proof_response.uniqueness = scorer.proof_of_uniqueness(filepath=twenty_three_file)
-        self.proof_response.ownership = scorer.proof_of_ownership()
-        self.proof_response.authenticity = scorer.proof_of_authenticity()
-        self.proof_response.quality = scorer.proof_of_quality(filepath=twenty_three_file)
+        self.update_proof_response(scorer, twenty_three_file)
 
         total_score = (0.25 * self.proof_response.quality + 0.25 * self.proof_response.ownership +
                        0.25 * self.proof_response.authenticity + 0.25 * self.proof_response.uniqueness)
+
+        if total_score < score_threshold:
+            self.reset_scores()
+            total_score = 0
+
         self.proof_response.score = total_score
         self.proof_response.valid = total_score >= score_threshold
 
