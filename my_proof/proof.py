@@ -359,11 +359,12 @@ class Proof:
             'dlp_id': self.config['dlp_id'],
         }
 
-        save_successful = scorer.save_hash(self.proof_response)
+        if self.proof_response.valid:
+            save_successful = scorer.save_hash(self.proof_response)
 
-        if save_successful:
-            print("Hash Data Saved Successfully.")
-        else:
-            raise Exception("Hash Data Saving Failed.")
+            if save_successful:
+                print("Hash Data Saved Successfully.")
+            else:
+                raise Exception("Hash Data Saving Failed.")
 
         return self.proof_response
